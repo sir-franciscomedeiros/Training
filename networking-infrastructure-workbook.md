@@ -109,19 +109,18 @@ sudo cp /etc/squid/squid.conf /etc/squid/squid.conf.bak
 ```
 
 ### Step 3: Configure a simple ACL
-Edit `/etc/squid/squid.conf` and add or adjust the access rules instead of replacing the whole file. Keep the Ubuntu defaults, then add or update the following lines near the existing ACL and `http_access` rules:
+Edit `/etc/squid/squid.conf` and add or adjust the access rules instead of replacing the whole file. Keep the Ubuntu defaults, including the existing manager and localhost access rules, then add or update only the `localnet` ACL entries:
 ```conf
-http_port 3128
 acl localnet src 192.168.0.0/16
 acl localnet src 10.0.0.0/8
 acl localnet src 172.16.0.0/12
 acl localnet src 127.0.0.1/32
-http_access allow localnet
-http_access deny all
-access_log /var/log/squid/access.log
-cache_log /var/log/squid/cache.log
 ```
-Place the `http_access allow localnet` rule before the final deny rule so approved clients match first.
+Then place the following rule after the existing `manager` and `localhost` access lines, but before the final `http_access deny all` rule:
+```conf
+http_access allow localnet
+```
+Leave the existing `http_port`, logging, and default manager/localhost rules in place.
 If you use the Docker alternative below, also allow the Docker bridge subnet used by your host, commonly:
 ```conf
 acl localnet src 172.17.0.0/16
@@ -620,8 +619,9 @@ sudo ufw status numbered
 
 ### Step 3: Start a temporary backend listener
 ```bash
-sudo sh -c "nohup python3 -m http.server 8080 --bind 0.0.0.0 >/tmp/firewall-test.log 2>&1 & echo \$! >/tmp/firewall-test.pid"
-sudo ss -tulpn | grep 8080
+nohup python3 -m http.server 8080 --bind 0.0.0.0 >/tmp/firewall-test.log 2>&1 &
+echo $! > /tmp/firewall-test.pid
+ss -tulpn | grep 8080
 ```
 From a second VM, workstation, or server on the same network, confirm the listener is reachable before adding the firewall block:
 ```bash
@@ -1216,6 +1216,10 @@ services:
     image: postgres:16
     env_file:
       - .env
+    volumes:
+      - db_data:/var/lib/postgresql/data
+volumes:
+  db_data:
 ```
 Example local `.env` content on the lab host:
 ```text
