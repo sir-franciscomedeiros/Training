@@ -1098,6 +1098,89 @@ redis-cli get site:banner
 sudo tcpdump -ni any port 9000 or port 8088 or port 8081 or port 8082
 ```
 
+## Capstone Sample Configurations
+### Sample HAProxy configuration
+```conf
+global
+    log /dev/log local0
+    daemon
+
+defaults
+    mode http
+    log global
+    option httplog
+    timeout connect 5s
+    timeout client 30s
+    timeout server 30s
+
+frontend public_http
+    bind *:9000
+    default_backend reverse_proxy_pool
+
+backend reverse_proxy_pool
+    balance roundrobin
+    option httpchk GET /
+    server nginxrp1 127.0.0.1:8088 check
+```
+
+### Sample Nginx reverse proxy configuration
+```conf
+upstream web_tier {
+    server 127.0.0.1:8081;
+    server 127.0.0.1:8082;
+}
+
+server {
+    listen 8088;
+    server_name app.lab.local;
+
+    location / {
+        proxy_pass http://web_tier;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Sample Docker Compose alternative
+```yaml
+services:
+  haproxy:
+    image: haproxy:2.9
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - nginx-rp
+
+  nginx-rp:
+    image: nginx:stable
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web1
+      - web2
+
+  web1:
+    image: httpd:2.4
+
+  web2:
+    image: httpd:2.4
+
+  redis:
+    image: redis:7
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: change-me-in-real-use
+```
+
 ## Failure Injection Exercises
 ### Exercise 1: Break reverse proxy routing
 - Introduce a bad upstream port
@@ -1158,6 +1241,28 @@ sudo tcpdump -ni any port 9000 or port 8088 or port 8081 or port 8082
 2. Break at least four components intentionally.
 3. Trace failures with logs and packet captures.
 4. Restore service and document the root cause for each failure.
+
+## Challenge Solutions
+### Beginner solution outline
+- Apache should serve a custom `index.html`.
+- Nginx should listen on the public port and proxy to Apache on a private port such as `8080`.
+- Direct user access should be tested only against Nginx, while backend exposure is blocked or unpublished.
+
+### Intermediate solution outline
+- HAProxy should listen on a single frontend port such as `9000`.
+- Two backends should be registered with health checks enabled.
+- UFW should allow only SSH and the chosen web port.
+- Stopping one backend should still leave the service reachable through the remaining healthy node.
+
+### Advanced solution outline
+- Redis should contain a key with a TTL and demonstrate hit/miss behavior.
+- Redis should bind only to internal interfaces or loopback in a single-host lab.
+- A `502` should be traced first in Nginx logs, then confirmed by checking upstream reachability and listening ports.
+
+### Expert solution outline
+- The full request path should be verifiable hop by hop.
+- Failures should be isolated by confirming the last healthy hop in the path.
+- Recovery should include service restart, config validation, firewall rollback, and post-fix curl testing.
 
 ---
 
@@ -1352,6 +1457,16 @@ Answer the following:
 - Firewall should allow only approved ports and block direct backend access.
 - Cache lab should show a Redis `PONG`, readable keys, and valid TTL behavior.
 - Capstone should demonstrate successful end-to-end traffic flow from firewall through load balancer, reverse proxy, web tier, cache, and protected data tier.
+
+## Troubleshooting Solution Pattern
+1. Reproduce the problem with `curl`, browser access, or service checks.
+2. Confirm the process is running with `systemctl status`, `docker ps`, or `ps aux`.
+3. Confirm the service is listening on the expected port with `ss -tulpn`.
+4. Validate the configuration with the native tool for that service.
+5. Read the most relevant log file or `journalctl` output.
+6. Trace packet flow with `tcpdump` if the symptom suggests a network block.
+7. Apply the smallest corrective change.
+8. Re-test from the user side and from each internal hop.
 
 ## Next Steps for Students
 - Repeat all labs using hostnames instead of raw IPs
