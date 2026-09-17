@@ -29,7 +29,7 @@ sudo apt update
 sudo apt install -y docker.io docker-compose-v2 curl jq
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
-newgrp docker
+# Log out and back in before running Docker without sudo.
 mkdir -p ~/devops-labs-docker && cd ~/devops-labs-docker
 ```
 
@@ -1194,6 +1194,7 @@ services:
 ```
 Example local `.env` content on the lab host:
 ```text
+POSTGRES_USER=labuser
 POSTGRES_PASSWORD=<set-locally-on-the-lab-host>
 ```
 
