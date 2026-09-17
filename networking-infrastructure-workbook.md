@@ -606,7 +606,12 @@ sudo ufw status numbered
 ### Step 3: Start a temporary backend listener
 ```bash
 sudo nohup python3 -m http.server 8080 --bind 0.0.0.0 >/tmp/firewall-test.log 2>&1 &
+echo $! | sudo tee /tmp/firewall-test.pid
 sudo ss -tulpn | grep 8080
+```
+From a second VM, workstation, or server on the same network, confirm the listener is reachable before adding the firewall block:
+```bash
+curl -I http://<HOST_EXTERNAL_IP>:8080 --max-time 3
 ```
 
 ### Step 4: Block the test backend port with iptables
@@ -619,12 +624,10 @@ sudo iptables -L INPUT -n --line-numbers
 ```bash
 # Replace the example below with the externally reachable IP of this Ubuntu host.
 HOST_IP=<HOST_EXTERNAL_IP>
-curl -I http://127.0.0.1
-# Run this from a second VM, workstation, or server on the same network:
 curl -sS -o /dev/null -w '%{http_code}\n' http://$HOST_IP:8080 --max-time 3
 ```
 
-**Expected output:** port 80 works; the second command returns `000` or times out because port 8080 is blocked **when tested from a different host on the network**.
+**Expected output:** the command returns `000` or times out because port 8080 is blocked **when tested from a different host on the network**.
 Loopback traffic to `127.0.0.1` or locally generated traffic on the same Ubuntu host is not a valid firewall test for this INPUT-chain rule.
 
 ### Docker-based alternative
@@ -642,7 +645,8 @@ sudo ss -tulpn
 sudo iptables -L INPUT -n --line-numbers
 # delete the matching DROP rule number shown above, for example:
 # sudo iptables -D INPUT 1
-sudo pkill -f 'python3 -m http.server 8080' || true
+sudo kill "$(cat /tmp/firewall-test.pid)" 2>/dev/null || true
+sudo rm -f /tmp/firewall-test.pid
 sudo ufw disable
 ```
 
@@ -1202,6 +1206,7 @@ Example local `.env` content on the lab host:
 ```text
 POSTGRES_USER=labuser
 POSTGRES_PASSWORD=<set-locally-on-the-lab-host>
+POSTGRES_DB=labdb
 ```
 
 ## Failure Injection Exercises
