@@ -173,7 +173,7 @@ sudo apt autoremove -y
 ```bash
 sudo squid -k parse
 sudo systemctl status squid --no-pager
-sudo ss -tulpn | grep squid
+sudo ss -tulpn | grep 3128
 sudo tail -n 50 /var/log/squid/access.log
 sudo tail -n 50 /var/log/squid/cache.log
 curl -v -x http://127.0.0.1:3128 http://example.com
@@ -605,7 +605,8 @@ sudo ufw status numbered
 
 ### Step 3: Block a test backend port with iptables
 ```bash
-HOST_IP=$(hostname -I | awk '{print $1}')
+# Replace the example below with the externally reachable IP of this Ubuntu host.
+HOST_IP=<HOST_EXTERNAL_IP>
 sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
 sudo iptables -L INPUT -n --line-numbers
 echo "$HOST_IP"
@@ -614,11 +615,12 @@ echo "$HOST_IP"
 ### Step 4: Verify behavior
 ```bash
 curl -I http://127.0.0.1
-docker run --rm curlimages/curl:8.11.1 -I http://$HOST_IP:8080 --max-time 3
+# Run this from a second VM, workstation, or server on the same network:
+curl -I http://$HOST_IP:8080 --max-time 3
 ```
 
-**Expected output:** port 80 works; port 8080 times out or is blocked **when tested from another host or container**.
-Loopback traffic to `127.0.0.1` on the same host is not a valid firewall test for this INPUT-chain rule.
+**Expected output:** port 80 works; port 8080 times out or is blocked **when tested from a different host on the network**.
+Loopback traffic to `127.0.0.1` or locally generated traffic on the same Ubuntu host is not a valid firewall test for this INPUT-chain rule.
 
 ### Docker-based alternative
 Apply published-port restrictions at the host firewall while containers expose services internally on a Docker network.
