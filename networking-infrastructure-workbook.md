@@ -122,6 +122,10 @@ access_log /var/log/squid/access.log
 cache_log /var/log/squid/cache.log
 ```
 Place the `http_access allow localnet` rule before the final deny rule so approved clients match first.
+If you use the Docker alternative below, also allow the Docker bridge subnet used by your host, commonly:
+```conf
+acl localnet src 172.17.0.0/16
+```
 
 ### Step 4: Validate and restart
 ```bash
@@ -429,10 +433,10 @@ Use HAProxy to distribute traffic between two Nginx backend servers.
 ### Step 1: Run two lightweight backends with Docker
 ```bash
 docker network create lb-lab
-docker run -d --name web1 --network lb-lab -p 8081:80 nginxdemos/hello
-docker run -d --name web2 --network lb-lab -p 8082:80 nginxdemos/hello
-curl http://127.0.0.1:8081 | head
-curl http://127.0.0.1:8082 | head
+docker run -d --name web1 --network lb-lab -p 8081:5678 hashicorp/http-echo -text='web1'
+docker run -d --name web2 --network lb-lab -p 8082:5678 hashicorp/http-echo -text='web2'
+curl http://127.0.0.1:8081
+curl http://127.0.0.1:8082
 ```
 
 ### Step 2: Install and configure HAProxy
@@ -476,7 +480,7 @@ sudo systemctl restart haproxy
 
 ### Step 4: Test balancing
 ```bash
-for i in {1..6}; do curl -s http://127.0.0.1:9000 | grep -E 'Server address|Hostname'; done
+for i in {1..6}; do curl -s http://127.0.0.1:9000; done
 ```
 
 **Expected output:** alternating responses from both backends.
@@ -605,8 +609,7 @@ sudo ufw status numbered
 
 ### Step 3: Start a temporary backend listener
 ```bash
-sudo nohup python3 -m http.server 8080 --bind 0.0.0.0 >/tmp/firewall-test.log 2>&1 &
-echo $! | sudo tee /tmp/firewall-test.pid
+sudo sh -c "nohup python3 -m http.server 8080 --bind 0.0.0.0 >/tmp/firewall-test.log 2>&1 & echo \$! >/tmp/firewall-test.pid"
 sudo ss -tulpn | grep 8080
 ```
 From a second VM, workstation, or server on the same network, confirm the listener is reachable before adding the firewall block:
@@ -984,20 +987,17 @@ Build a small production-style platform on Ubuntu that demonstrates how security
                     [Firewall: UFW/iptables]
                            |
                            v
-                 [Load Balancer: HAProxy]
-                           |
-                           v
+                [Load Balancer: HAProxy]
+                          |
+                          v
                 [Reverse Proxy: Nginx Layer]
-                     /                   \
-                    v                     v
+                    /                   \
+                   v                     v
             [Web Server 1]          [Web Server 2]
-                    \                  /
-                     \                /
-                      v              v
-                       [Redis Cache Layer]
-                              |
-                              v
-                           [Database]
+                   |  \              /  |
+                   |   \            /   |
+                   v    v          v    v
+               [Redis Cache]     [Database]
 ```
 
 ## Real-World Placement of Each Component
