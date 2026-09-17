@@ -109,22 +109,19 @@ sudo cp /etc/squid/squid.conf /etc/squid/squid.conf.bak
 ```
 
 ### Step 3: Configure a simple ACL
-Edit `/etc/squid/squid.conf` and ensure it contains:
+Edit `/etc/squid/squid.conf` and add or adjust the access rules instead of replacing the whole file. Keep the Ubuntu defaults, then add or update the following lines near the existing ACL and `http_access` rules:
 ```conf
 http_port 3128
 acl localnet src 192.168.0.0/16
 acl localnet src 10.0.0.0/8
 acl localnet src 172.16.0.0/12
+acl localnet src 127.0.0.1/32
 http_access allow localnet
 http_access deny all
 access_log /var/log/squid/access.log
 cache_log /var/log/squid/cache.log
 ```
-
-For a single-host lab, you can temporarily allow localhost:
-```conf
-acl localnet src 127.0.0.1/32
-```
+Place the `http_access allow localnet` rule before the final deny rule so approved clients match first.
 
 ### Step 4: Validate and restart
 ```bash
@@ -289,6 +286,7 @@ server {
 Enable it:
 ```bash
 sudo ln -s /etc/nginx/sites-available/reverse-proxy.conf /etc/nginx/sites-enabled/reverse-proxy.conf
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -607,17 +605,20 @@ sudo ufw status numbered
 
 ### Step 3: Block a test backend port with iptables
 ```bash
+HOST_IP=$(hostname -I | awk '{print $1}')
 sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
 sudo iptables -L INPUT -n --line-numbers
+echo "$HOST_IP"
 ```
 
 ### Step 4: Verify behavior
 ```bash
 curl -I http://127.0.0.1
-curl -I http://127.0.0.1:8080 --max-time 3
+docker run --rm curlimages/curl:8.11.1 curl -I http://$HOST_IP:8080 --max-time 3
 ```
 
-**Expected output:** port 80 works; port 8080 times out or is blocked.
+**Expected output:** port 80 works; port 8080 times out or is blocked **when tested from another host or container**.
+Loopback traffic to `127.0.0.1` on the same host is not a valid firewall test for this INPUT-chain rule.
 
 ### Docker-based alternative
 Apply published-port restrictions at the host firewall while containers expose services internally on a Docker network.
@@ -1071,9 +1072,11 @@ Deploy two web servers on ports 8081 and 8082, each serving a unique page.
 
 Example page content:
 ```bash
-echo '<h1>Web Server 1</h1>' | sudo tee /var/www/html/web1.html
-echo '<h1>Web Server 2</h1>' | sudo tee /var/www/html/web2.html
+mkdir -p ~/capstone/web1 ~/capstone/web2
+echo '<h1>Web Server 1</h1>' > ~/capstone/web1/index.html
+echo '<h1>Web Server 2</h1>' > ~/capstone/web2/index.html
 ```
+Each backend should return a unique `index.html` so requests to `/` clearly show which server answered.
 
 ### Step 2: Configure reverse proxy
 Forward `/` to the web tier and preserve forwarding headers.
@@ -1145,6 +1148,7 @@ server {
 ```
 
 ### Sample Docker Compose alternative
+Save the following as `compose.yaml`, then run `docker compose up -d` from the same directory:
 ```yaml
 services:
   haproxy:
@@ -1178,7 +1182,7 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_PASSWORD: change-me-in-real-use
+      POSTGRES_PASSWORD: set-in-env-file
 ```
 
 ## Failure Injection Exercises
