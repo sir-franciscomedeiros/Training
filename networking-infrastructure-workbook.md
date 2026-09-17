@@ -625,9 +625,8 @@ sudo iptables -L INPUT -n --line-numbers
 
 ### Step 5: Verify behavior
 ```bash
-# Replace the example below with the externally reachable IP of this Ubuntu host.
-HOST_IP=<HOST_EXTERNAL_IP>
-curl -sS -o /dev/null -w '%{http_code}\n' http://$HOST_IP:8080 --max-time 3
+# Run this on a second machine, not on the Ubuntu firewall host:
+curl -sS -o /dev/null -w '%{http_code}\n' http://<HOST_EXTERNAL_IP>:8080 --max-time 3
 ```
 
 **Expected output:** the command returns `000` or times out because port 8080 is blocked **when tested from a different host on the network**.
