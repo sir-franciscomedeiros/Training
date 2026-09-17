@@ -616,7 +616,7 @@ echo "$HOST_IP"
 ```bash
 curl -I http://127.0.0.1
 # Run this from a second VM, workstation, or server on the same network:
-curl -I http://$HOST_IP:8080 --max-time 3
+curl -sS -o /dev/null -w '%{http_code}\n' http://$HOST_IP:8080 --max-time 3
 ```
 
 **Expected output:** port 80 works; port 8080 times out or is blocked **when tested from a different host on the network**.
@@ -1152,7 +1152,7 @@ server {
 ```
 
 ### Sample Docker Compose alternative
-Create `web1/index.html` and `web2/index.html` with different page content, Save the following as `compose.yaml`, store database credentials in a local `.env` file that is not committed, then run `docker compose up -d` from the same directory:
+Create `web1/index.html` and `web2/index.html` with different page content, save the following as `compose.yaml`, store database credentials in a local `.env` file that is not committed, then run `docker compose up -d` from the same directory:
 ```yaml
 services:
   haproxy:
