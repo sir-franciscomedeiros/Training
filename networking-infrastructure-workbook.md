@@ -26,7 +26,7 @@ sudo mkdir -p /opt/devops-labs/{forward-proxy,reverse-proxy,load-balancer,firewa
 ### Docker Preparation
 ```bash
 sudo apt update
-sudo apt install -y docker.io docker-compose-v2 curl jq
+sudo apt install -y docker.io docker-compose-plugin curl jq
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 # Log out and back in before running Docker without sudo.
@@ -605,21 +605,20 @@ sudo ufw status numbered
 
 ### Step 3: Block a test backend port with iptables
 ```bash
-# Replace the example below with the externally reachable IP of this Ubuntu host.
-HOST_IP=<HOST_EXTERNAL_IP>
 sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
 sudo iptables -L INPUT -n --line-numbers
-echo "$HOST_IP"
 ```
 
 ### Step 4: Verify behavior
 ```bash
+# Replace the example below with the externally reachable IP of this Ubuntu host.
+HOST_IP=<HOST_EXTERNAL_IP>
 curl -I http://127.0.0.1
 # Run this from a second VM, workstation, or server on the same network:
 curl -sS -o /dev/null -w '%{http_code}\n' http://$HOST_IP:8080 --max-time 3
 ```
 
-**Expected output:** port 80 works; port 8080 times out or is blocked **when tested from a different host on the network**.
+**Expected output:** port 80 works; the second command returns `000` or times out because port 8080 is blocked **when tested from a different host on the network**.
 Loopback traffic to `127.0.0.1` or locally generated traffic on the same Ubuntu host is not a valid firewall test for this INPUT-chain rule.
 
 ### Docker-based alternative
