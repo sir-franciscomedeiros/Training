@@ -144,8 +144,16 @@ curl -x http://127.0.0.1:3128 http://example.com -I
 
 ### Docker-based alternative
 ```bash
+cat > squid-docker.conf <<'CONF'
+http_port 3128
+acl localnet src 127.0.0.1/32
+acl localnet src 172.17.0.0/16
+http_access allow localnet
+http_access deny all
+CONF
 docker run -d --name squid \
   -p 3128:3128 \
+  -v $PWD/squid-docker.conf:/etc/squid/squid.conf:ro \
   ubuntu/squid:latest
 curl -x http://127.0.0.1:3128 http://example.com -I
 ```
@@ -263,6 +271,9 @@ sudo apt install -y apache2 nginx
 sudo cp /etc/apache2/ports.conf /etc/apache2/ports.conf.bak
 sudo sed -i 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf
 sudo sed -i 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-available/000-default.conf
+grep -R '<VirtualHost .*:80>' /etc/apache2/sites-enabled || true
+# If any other enabled sites still use *:80, disable them with:
+# sudo a2dissite <site-name>
 echo '<h1>Backend Apache on 8080</h1>' | sudo tee /var/www/html/index.html
 sudo systemctl restart apache2
 curl http://127.0.0.1:8080
@@ -619,7 +630,7 @@ curl -I http://<HOST_EXTERNAL_IP>:8080 --max-time 3
 
 ### Step 4: Block the test backend port with iptables
 ```bash
-sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
+sudo iptables -I INPUT 1 -p tcp --dport 8080 -j DROP
 sudo iptables -L INPUT -n --line-numbers
 ```
 
@@ -771,7 +782,7 @@ sudo redis-cli get product:100
 
 ### Docker-based alternative
 ```bash
-docker run -d --name redis-lab -p 6380:6379 redis:7
+docker run -d --name redis-lab -p 127.0.0.1:6380:6379 redis:7
 sudo redis-cli -h 127.0.0.1 -p 6380 ping
 ```
 
