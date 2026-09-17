@@ -19,7 +19,7 @@ This workbook is for beginner-to-intermediate DevOps engineers who want practica
 ### Manual Preparation
 ```bash
 sudo apt update
-sudo apt install -y nginx apache2 haproxy squid redis-server ufw iptables curl wget vim net-tools dnsutils tcpdump jq rsyslog
+sudo apt install -y nginx apache2 haproxy squid redis-server ufw iptables curl wget vim net-tools dnsutils tcpdump jq rsyslog python3
 sudo mkdir -p /opt/devops-labs/{forward-proxy,reverse-proxy,load-balancer,firewall,caching,webserver,capstone}
 ```
 
@@ -781,6 +781,11 @@ sudo ss -tulpn | grep 6379
 sudo redis-cli info memory | head
 sudo redis-cli monitor
 ```
+For the Docker alternative, verify host port `6380` instead:
+```bash
+sudo ss -tulpn | grep 6380
+sudo redis-cli -h 127.0.0.1 -p 6380 ping
+```
 
 ### Cleanup steps
 ```bash
@@ -1161,7 +1166,7 @@ server {
 ```
 
 ### Sample Docker Compose alternative
-Create `web1/index.html` and `web2/index.html` with different page content, save the following as `compose.yaml`, store database credentials in a local `.env` file that is not committed, then run `docker compose up -d` from the same directory:
+Create `web1/index.html` and `web2/index.html` with different page content, create `haproxy.cfg` and `nginx.conf` from the sample HAProxy and Nginx configurations above, save the following as `compose.yaml`, store database credentials in a local `.env` file that is not committed, then run `docker compose up -d` from the same directory:
 ```yaml
 services:
   haproxy:
