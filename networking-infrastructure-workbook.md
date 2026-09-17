@@ -740,39 +740,39 @@ sudo systemctl status redis-server --no-pager
 
 ### Step 2: Test Redis CLI
 ```bash
-redis-cli ping
-redis-cli set lab:message "hello cache"
-redis-cli get lab:message
-redis-cli expire lab:message 60
-redis-cli ttl lab:message
+sudo redis-cli ping
+sudo redis-cli set lab:message "hello cache"
+sudo redis-cli get lab:message
+sudo redis-cli expire lab:message 60
+sudo redis-cli ttl lab:message
 ```
 
 **Expected output:** `PONG`, then `hello cache`, then a positive TTL.
 
 ### Step 3: Simulate cache hit and miss
 ```bash
-redis-cli del product:100
-redis-cli get product:100
-redis-cli setex product:100 120 '{"id":100,"name":"Demo Product"}'
-redis-cli get product:100
+sudo redis-cli del product:100
+sudo redis-cli get product:100
+sudo redis-cli setex product:100 120 '{"id":100,"name":"Demo Product"}'
+sudo redis-cli get product:100
 ```
 
 ### Docker-based alternative
 ```bash
 docker run -d --name redis-lab -p 6379:6379 redis:7
-redis-cli -h 127.0.0.1 -p 6379 ping
+sudo redis-cli -h 127.0.0.1 -p 6379 ping
 ```
 
 ### Verification steps
 ```bash
 sudo ss -tulpn | grep 6379
-redis-cli info memory | head
-redis-cli monitor
+sudo redis-cli info memory | head
+sudo redis-cli monitor
 ```
 
 ### Cleanup steps
 ```bash
-redis-cli flushall
+sudo redis-cli del lab:message product:100
 sudo systemctl stop redis-server
 # Docker alternative
 # docker rm -f redis-lab
@@ -787,9 +787,9 @@ sudo systemctl stop redis-server
 
 ### Diagnostic commands
 ```bash
-redis-cli ping
-redis-cli info server
-redis-cli info memory
+sudo redis-cli ping
+sudo redis-cli info server
+sudo redis-cli info memory
 sudo journalctl -u redis-server -n 50 --no-pager
 sudo ss -tulpn | grep 6379
 ```
@@ -800,8 +800,8 @@ sudo ss -tulpn | grep 6379
 
 ### How to validate configuration
 ```bash
-redis-cli CONFIG GET bind
-redis-cli CONFIG GET maxmemory-policy
+sudo redis-cli CONFIG GET bind
+sudo redis-cli CONFIG GET maxmemory-policy
 ```
 
 ## DevOps Perspective
@@ -1152,7 +1152,7 @@ server {
 ```
 
 ### Sample Docker Compose alternative
-Create `web1/index.html` and `web2/index.html` with different page content, save the following as `compose.yaml`, then run `docker compose up -d` from the same directory:
+Create `web1/index.html` and `web2/index.html` with different page content, Save the following as `compose.yaml`, store database credentials in a local `.env` file that is not committed, then run `docker compose up -d` from the same directory:
 ```yaml
 services:
   haproxy:
@@ -1189,8 +1189,12 @@ services:
 
   db:
     image: postgres:16
-    environment:
-      POSTGRES_PASSWORD: set-in-env-file
+    env_file:
+      - .env
+```
+Example local `.env` content on the lab host:
+```text
+POSTGRES_PASSWORD=<set-locally-on-the-lab-host>
 ```
 
 ## Failure Injection Exercises
