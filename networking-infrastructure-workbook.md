@@ -614,7 +614,7 @@ echo "$HOST_IP"
 ### Step 4: Verify behavior
 ```bash
 curl -I http://127.0.0.1
-docker run --rm curlimages/curl:8.11.1 curl -I http://$HOST_IP:8080 --max-time 3
+docker run --rm curlimages/curl:8.11.1 -I http://$HOST_IP:8080 --max-time 3
 ```
 
 **Expected output:** port 80 works; port 8080 times out or is blocked **when tested from another host or container**.
@@ -632,7 +632,9 @@ sudo ss -tulpn
 
 ### Cleanup steps
 ```bash
-sudo iptables -D INPUT -p tcp --dport 8080 -j DROP
+sudo iptables -L INPUT -n --line-numbers
+# delete the matching DROP rule number shown above, for example:
+# sudo iptables -D INPUT 1
 sudo ufw disable
 ```
 
@@ -1148,7 +1150,7 @@ server {
 ```
 
 ### Sample Docker Compose alternative
-Save the following as `compose.yaml`, then run `docker compose up -d` from the same directory:
+Create `web1/index.html` and `web2/index.html` with different page content, save the following as `compose.yaml`, then run `docker compose up -d` from the same directory:
 ```yaml
 services:
   haproxy:
@@ -1172,9 +1174,13 @@ services:
 
   web1:
     image: httpd:2.4
+    volumes:
+      - ./web1/index.html:/usr/local/apache2/htdocs/index.html:ro
 
   web2:
     image: httpd:2.4
+    volumes:
+      - ./web2/index.html:/usr/local/apache2/htdocs/index.html:ro
 
   redis:
     image: redis:7
