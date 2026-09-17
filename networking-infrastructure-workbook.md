@@ -4,34 +4,139 @@
 This workbook is for beginner-to-intermediate DevOps engineers who want practical experience with core networking and infrastructure building blocks on Ubuntu Linux. Every module explains the concept, places it in a real production architecture, and then walks through a hands-on lab with verification, troubleshooting, cleanup, and cloud/Kubernetes mapping.
 
 ## Lab Conventions
-- **Primary OS:** Ubuntu 24.04 LTS or 22.04 LTS
+- **Supported operating systems:** Ubuntu 24.04 LTS or 22.04 LTS on a VM or physical host, or Ubuntu on WSL2 with Docker Desktop integration for container labs
 - **Privileges:** Commands use `sudo` where required
-- **Working directory:** `/opt/devops-labs`
+- **Working directory:** `/opt/devops-labs` for host-based labs and `~/devops-labs-docker` for Docker-based labs
 - **Local test domain examples:** `lab.local`, `app.lab.local`, `proxy.lab.local`
+- **Compose command:** Use `docker compose` for Compose-based labs
 - **Tools used:** Nginx, HAProxy, Squid, Redis, UFW, iptables, Apache2, Docker, curl, ss, netstat-compatible tools, tcpdump
 
 ## Suggested Lab Host Sizes
 - **Single-node laptop or VM:** 2 vCPU, 4 GB RAM, 25 GB disk
 - **Capstone environment:** 4 vCPU, 8 GB RAM, 40 GB disk
 
+## Supported Lab Environments
+
+### Option A: Ubuntu VM or physical Ubuntu host
+**Recommended for:** the complete workbook, especially manual-service labs and realistic firewall validation.
+
+**Advantages**
+- Closest match to a standalone Ubuntu server
+- Supports host-managed services with `systemctl`
+- Better fit for UFW, iptables, direct interface work, and cross-host validation
+- Best environment for the capstone when you want all layers on one Linux host
+
+**Limitations**
+- Heavier setup than WSL2 for quick Docker-only labs
+- Requires a dedicated VM or Linux host if your main machine is Windows
+
+**Intended use**
+- Manual service installation
+- systemd-based service management
+- UFW and iptables exercises
+- Cross-host and externally reachable networking tests
+
+### Option B: WSL2 with Docker Desktop
+**Recommended for:** Docker-based labs, containerized services, and Compose exercises.
+
+**Advantages**
+- Fast setup on Windows when Docker Desktop is already in use
+- Excellent fit for container-based proxy, load-balancer, Redis, and web-server exercises
+- Easy access to `docker` and `docker compose` from the Ubuntu terminal after WSL integration is enabled
+
+**Limitations**
+- Docker runs through Docker Desktop rather than a separate native Linux Docker Engine inside WSL
+- `systemctl` works only when systemd is enabled in WSL
+- UFW, iptables, host networking, and multi-machine firewall validation do not behave like a separate Ubuntu server
+- Published ports are mediated by Docker Desktop and Windows networking, so localhost behavior can differ between WSL, Windows, and containers
+
+**Intended use**
+- Docker-based alternatives in each module
+- Single-machine local verification from the WSL terminal
+- Compose-based capstone exercises when a full Ubuntu VM is not available
+
+### Compatibility Matrix
+| Module | WSL2 + Docker Desktop status | Notes |
+| --- | --- | --- |
+| Forward proxy | Supported with limitations | Docker-based Squid lab works well; manual host-managed Squid is less representative |
+| Reverse proxy | Supported with limitations | Docker-based path works well; manual Apache and Nginx steps depend on host services |
+| Load balancer | Supported with limitations | Local HAProxy testing works, but mixed host/container networking is more realistic on a VM |
+| Firewall | Better performed in an Ubuntu VM | Requires host firewall semantics and cross-host validation |
+| Caching server | Fully supported in WSL2 + Docker Desktop | Redis container workflow is a strong fit for WSL2 |
+| Web server | Supported with limitations | Docker-based web serving works well; manual Apache service management is more VM-like |
+| Capstone | Better performed in an Ubuntu VM | Full manual-service, firewall, and cross-host validation are more realistic on a VM |
+
 ## Environment Preparation
 
-### Manual Preparation
+### Path 1: Native Ubuntu VM or physical host
+Use this path when you want to complete the full workbook, including manual-service and firewall labs.
+
+#### Host packages for manual-service labs
 ```bash
 sudo apt update
 sudo apt install -y nginx apache2 haproxy squid redis-server ufw iptables curl wget vim net-tools dnsutils tcpdump jq rsyslog python3
 sudo mkdir -p /opt/devops-labs/{forward-proxy,reverse-proxy,load-balancer,firewall,caching,webserver,capstone}
 ```
 
-### Docker Preparation
+#### Docker Engine on native Ubuntu
 ```bash
 sudo apt update
 sudo apt install -y docker.io docker-compose-plugin curl jq
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
+docker version
+docker compose version
+sudo docker run --rm hello-world
 # Log out and back in before running Docker without sudo.
-mkdir -p ~/devops-labs-docker && cd ~/devops-labs-docker
+sudo mkdir -p /opt/devops-labs/docker && cd /opt/devops-labs/docker
 ```
+
+### Path 2: WSL2 with Docker Desktop
+Use this path for the Docker-based labs and containerized services.
+
+1. Install Docker Desktop on Windows.
+2. In Docker Desktop, enable WSL integration for your Ubuntu distribution.
+3. Open the Ubuntu WSL terminal and run Docker commands there after integration is enabled.
+
+Do **not** install `docker.io` or `docker-compose-plugin` inside WSL when you intend to use Docker Desktop integration. Docker Desktop already provides the Docker daemon and `docker compose`.
+
+```bash
+sudo apt update
+sudo apt install -y curl jq
+mkdir -p ~/devops-labs-docker && cd ~/devops-labs-docker
+docker version
+docker compose version
+docker run --rm hello-world
+```
+
+If Docker Desktop integration was just enabled and the commands above still fail, run `wsl --shutdown` from PowerShell or Windows Terminal, reopen Ubuntu, and retry from the WSL terminal.
+
+### systemd requirements in WSL
+Manual-service labs use `systemctl`, which requires systemd to be enabled in WSL. Create or edit `/etc/wsl.conf` so it contains:
+
+```ini
+[boot]
+systemd=true
+```
+
+After changing `/etc/wsl.conf`, run `wsl --shutdown` from PowerShell or Windows Terminal, then reopen Ubuntu. Enabling systemd helps host-installed services work more predictably, but it does **not** make WSL equivalent to a separate Ubuntu server for firewalling, host networking, or cross-machine testing.
+
+Where a service supports it, `sudo service <name> status` or `sudo service <name> restart` can be a fallback when systemd is unavailable, but it is not identical for every service and should not be treated as a full replacement.
+
+## Docker-Based Lab Notes for WSL2 + Docker Desktop
+- Run Docker commands from the Ubuntu WSL terminal after enabling Docker Desktop integration.
+- Docker containers run on Docker Desktop's engine, not on a separate Docker Engine installed inside WSL.
+- Published ports such as `-p 9000:9000` are exposed through Docker Desktop and Windows networking.
+- `localhost` access can differ between WSL, Windows, and containers, so document what you observe when testing published ports.
+- For container-to-container communication, use Docker service or container names on a shared Docker network instead of `127.0.0.1`.
+- For Compose exercises, use `docker compose`.
+- For container logs, prefer `docker logs <container>` over assuming host log files under `/var/log/...`.
+
+## Recommendation
+- Use WSL2 + Docker Desktop for the Docker proxy, reverse-proxy, load-balancer, Redis, web-server, and Compose exercises.
+- Use an Ubuntu VM or physical Ubuntu host for the complete manual-service, systemd, UFW, iptables, cross-host networking, and realistic firewall exercises.
+- If you only have WSL2 + Docker Desktop, complete the Docker-based alternatives and document that firewall and host-network validation were limited.
+- If you only have a native Ubuntu VM or host, you can complete the entire workbook there, including both manual and Docker-based paths.
 
 ---
 
@@ -93,6 +198,8 @@ A forward proxy is typically placed on the egress path between internal users or
 ### Objective
 Install and configure Squid as a forward proxy and verify that a client can browse through it.
 
+> **Environment note:** The manual path below is best on a native Ubuntu VM or host. It depends on a host-installed Squid service, `systemctl`, and direct host port binding on `3128`. In WSL, enable systemd before using the manual steps; otherwise prefer the Docker-based alternative.
+
 ### Step 1: Install Squid manually
 ```bash
 sudo apt update
@@ -142,6 +249,8 @@ curl -x http://127.0.0.1:3128 http://example.com -I
 **Expected output:** an HTTP response such as `HTTP/1.1 200 OK`
 
 ### Docker-based alternative
+For WSL2 + Docker Desktop, run these commands from the Ubuntu WSL terminal. The published proxy port is exposed through Docker Desktop networking, and any later container-to-container tests should use shared Docker networks and container names instead of `127.0.0.1`.
+
 ```bash
 cat > squid-docker.conf <<'CONF'
 http_port 3128
@@ -264,6 +373,8 @@ It is placed on the inbound path, usually behind a load balancer or CDN and in f
 ### Objective
 Use Nginx as a reverse proxy in front of Apache.
 
+> **Environment note:** The manual path below is best on a native Ubuntu VM or host. It depends on host-managed Apache and Nginx services, `systemctl`, and direct host port binding on `8080` and `80`. In WSL, enable systemd before using the manual steps; otherwise prefer the Docker-based alternative.
+
 ### Step 1: Ensure Apache is running on port 8080
 ```bash
 sudo apt install -y apache2 nginx
@@ -313,6 +424,8 @@ curl -H 'Host: app.lab.local' http://127.0.0.1
 **Expected output:** `Backend Apache on 8080`
 
 ### Docker-based alternative
+For WSL2 + Docker Desktop, run this from the Ubuntu WSL terminal. Keep both containers on the shared Docker network and use `apache-backend:80` for container-to-container communication instead of `127.0.0.1`.
+
 ```bash
 docker network create proxy-lab
 docker run -d --name apache-backend --network proxy-lab httpd:2.4
@@ -440,7 +553,11 @@ Usually between the firewall edge and reverse proxy or directly in front of appl
 ### Objective
 Use HAProxy to distribute traffic between two Nginx backend servers.
 
+> **Environment note:** This lab mixes Docker backends with a host-managed HAProxy service. The HAProxy steps depend on `systemctl` and direct host port binding on `9000`, so a native Ubuntu VM or host is more realistic. In WSL, enable systemd first and document that published-port behavior is mediated by Docker Desktop.
+
 ### Step 1: Run two lightweight backends with Docker
+In WSL2 + Docker Desktop, these published ports are exposed through Docker Desktop and Windows networking.
+
 ```bash
 docker network create lb-lab
 docker run -d --name web1 --network lb-lab -p 8081:5678 hashicorp/http-echo -text='web1'
@@ -600,6 +717,8 @@ At the host, subnet, VPC/VNet, and edge layers.
 ### Objective
 Use UFW and iptables to allow HTTP and block direct backend ports.
 
+> **Environment note:** This manual firewall lab is best on a native Ubuntu VM or physical host. It depends on host-level interfaces, direct host port binding, UFW and iptables behavior, and validation from a second machine on the network. WSL2 does not behave like a separate Ubuntu firewall host even when systemd is enabled.
+
 ### Step 1: Check current status
 ```bash
 sudo ufw status verbose
@@ -623,7 +742,7 @@ nohup python3 -m http.server 8080 --bind 0.0.0.0 >/tmp/firewall-test.log 2>&1 &
 echo $! > /tmp/firewall-test.pid
 ss -tulpn | grep 8080
 ```
-From a second VM, workstation, or server on the same network, confirm the listener is reachable before adding the firewall block:
+From a second VM, workstation, or server on the same network, confirm the listener is reachable before adding the firewall block. This cross-host validation step is **VM/physical-host only**:
 ```bash
 curl -I http://<HOST_EXTERNAL_IP>:8080 --max-time 3
 ```
@@ -636,21 +755,39 @@ sudo iptables -L INPUT -n --line-numbers
 
 ### Step 5: Verify behavior
 ```bash
-# Run this on a second machine, not on the Ubuntu firewall host:
+# Run this on a second machine, not on the Ubuntu firewall host. This is VM/physical-host only:
 curl -sS -o /dev/null -w '%{http_code}\n' http://<HOST_EXTERNAL_IP>:8080 --max-time 3
 ```
 
 **Expected output:** the command returns `000` or times out because port 8080 is blocked **when tested from a different host on the network**.
 Loopback traffic to `127.0.0.1` or locally generated traffic on the same Ubuntu host is not a valid firewall test for this INPUT-chain rule.
+Inside WSL2, same-host curl tests are also not sufficient to validate an INPUT-chain rule because Docker Desktop networking and Windows firewall behavior can change the result.
 
 ### Docker-based alternative
-Apply published-port restrictions at the host firewall while containers expose services internally on a Docker network.
+Use this WSL-safe alternative to focus on container network isolation and published-port behavior:
+
+```bash
+docker network create firewall-lab
+docker run -d --name fw-private --network firewall-lab hashicorp/http-echo -text='private service'
+docker run --rm --network firewall-lab curlimages/curl:8.9.1 http://fw-private:5678
+curl http://127.0.0.1:5678 || true
+docker run -d --name fw-published --network firewall-lab -p 127.0.0.1:8080:5678 hashicorp/http-echo -text='published service'
+docker port fw-published
+curl http://127.0.0.1:8080
+```
+
+This demonstrates that unpublished container ports stay inside the Docker network while published ports are reachable through Docker Desktop or host networking. It is **not** a substitute for validating Linux host INPUT-chain enforcement, UFW policy ordering, or true external-host firewall behavior.
 
 ### Verification steps
 ```bash
 sudo ufw status verbose
 sudo iptables -L -n -v
 sudo ss -tulpn
+# WSL-safe Docker alternative checks:
+# docker ps
+# docker network inspect firewall-lab
+# docker logs fw-private
+# docker logs fw-published
 ```
 
 ### Cleanup steps
@@ -661,6 +798,9 @@ sudo iptables -L INPUT -n --line-numbers
 sudo kill "$(cat /tmp/firewall-test.pid)" 2>/dev/null || true
 sudo rm -f /tmp/firewall-test.pid
 sudo ufw disable
+# Docker alternative:
+# docker rm -f fw-private fw-published
+# docker network rm firewall-lab
 ```
 
 ## Troubleshooting Section
@@ -754,6 +894,8 @@ Cache miss: App queries DB, stores result in Redis, returns response
 ### Objective
 Run Redis, write sample keys, and validate cache behavior.
 
+> **Environment note:** The manual path below depends on a host-installed Redis service and `systemctl`, so a native Ubuntu VM or host is preferred. In WSL, enable systemd before using the manual steps; otherwise use the Docker-based alternative.
+
 ### Step 1: Install Redis
 ```bash
 sudo apt install -y redis-server
@@ -781,9 +923,11 @@ sudo redis-cli get product:100
 ```
 
 ### Docker-based alternative
+For WSL2 + Docker Desktop, run this from the Ubuntu WSL terminal. The published Redis port is exposed through Docker Desktop networking; if you later add more containers, use shared Docker networks and service names for container-to-container access instead of `127.0.0.1`.
+
 ```bash
 docker run -d --name redis-lab -p 127.0.0.1:6380:6379 redis:7
-sudo redis-cli -h 127.0.0.1 -p 6380 ping
+docker exec redis-lab redis-cli ping
 ```
 
 ### Verification steps
@@ -795,7 +939,7 @@ sudo redis-cli monitor
 For the Docker alternative, verify host port `6380` instead:
 ```bash
 sudo ss -tulpn | grep 6380
-sudo redis-cli -h 127.0.0.1 -p 6380 ping
+docker exec redis-lab redis-cli ping
 ```
 
 ### Cleanup steps
@@ -892,6 +1036,8 @@ As an application origin, static asset server, or backend behind reverse proxies
 ### Objective
 Deploy Apache as a simple web server and validate content delivery.
 
+> **Environment note:** The manual path below is best on a native Ubuntu VM or host. It depends on a host-managed Apache service, `systemctl`, and direct host port binding on `80`. In WSL, enable systemd before using the manual steps; otherwise prefer the Docker-based alternative.
+
 ### Step 1: Install Apache
 ```bash
 sudo apt install -y apache2
@@ -935,6 +1081,8 @@ curl -H 'Host: app.lab.local' http://127.0.0.1
 ```
 
 ### Docker-based alternative
+For WSL2 + Docker Desktop, run this from the Ubuntu WSL terminal. The published port is exposed through Docker Desktop networking, so note any differences you see between access from WSL, Windows, and other clients.
+
 ```bash
 docker run -d --name apache-web -p 8085:80 httpd:2.4
 curl http://127.0.0.1:8085
@@ -1025,6 +1173,7 @@ Build a small production-style platform on Ubuntu that demonstrates how security
 
 ## Environment Setup
 ### Option A: Single Ubuntu host with multiple ports
+- Best fit for a native Ubuntu VM or physical host
 - Firewall on host
 - HAProxy on port 80/443 or 9000 for lab
 - Nginx reverse proxy on 8088
@@ -1033,6 +1182,7 @@ Build a small production-style platform on Ubuntu that demonstrates how security
 - Database placeholder on 5432 or 3306
 
 ### Option B: Docker Compose style topology
+- Best fit for WSL2 + Docker Desktop or any host that already uses Docker Compose
 - `firewall` enforced at host
 - `haproxy` container
 - `nginx-rp` container
@@ -1096,6 +1246,8 @@ Client -> TCP/443 -> Firewall -> HAProxy -> Nginx Reverse Proxy -> Web1/Web2
 - Centralize to ELK, Loki, Splunk, or cloud-native logging later
 
 ## Capstone Hands-On Build
+> **Environment note:** For the full capstone, use a native Ubuntu VM or physical host when you need manual services, `systemctl`, host-level interfaces, UFW or iptables behavior, direct host port binding, and cross-host validation. On WSL2 + Docker Desktop, the Compose topology works well, but firewall validation remains limited and should be documented as such.
+
 ### Step 1: Start web servers
 Deploy two web servers on ports 8081 and 8082, each serving a unique page.
 
@@ -1114,7 +1266,7 @@ Forward `/` to the web tier and preserve forwarding headers.
 Balance across reverse proxy nodes or a single reverse proxy endpoint for a smaller lab.
 
 ### Step 4: Enable firewall policy
-Only expose `22`, `80`, and `443` or a lab test port such as `9000`.
+Only expose `22`, `80`, and `443` or a lab test port such as `9000`. Treat realistic host-firewall validation as VM or physical-host work; on WSL2 + Docker Desktop, document that published-port behavior is not equivalent to a production Linux host firewall.
 
 ### Step 5: Deploy Redis
 Use Redis for a test object such as `site:banner` or `session:user123`.
@@ -1126,7 +1278,11 @@ Use a lightweight database container or document it as a protected backend depen
 ```bash
 curl -I http://127.0.0.1:9000
 curl -H 'Host: app.lab.local' http://127.0.0.1:9000
+# Native Ubuntu host:
 redis-cli get site:banner
+# Docker Compose path:
+docker compose exec redis redis-cli get site:banner
+# Packet capture is most useful on a native Ubuntu VM or host:
 sudo tcpdump -ni any port 9000 or port 8088 or port 8081 or port 8082
 ```
 
@@ -1177,7 +1333,7 @@ server {
 ```
 
 ### Sample Docker Compose alternative
-Create `web1/index.html` and `web2/index.html` with different page content, create `haproxy.cfg` and `nginx.conf` from the sample HAProxy and Nginx configurations above, save the following as `compose.yaml`, store database credentials in a local `.env` file that is not committed, then run `docker compose up -d` from the same directory:
+Create `web1/index.html` and `web2/index.html` with different page content, create `haproxy.cfg` and `nginx.conf` from the sample HAProxy and Nginx configurations above, save the following as `compose.yaml`, store database credentials in a local `.env` file that is not committed, then run `docker compose up -d` from the same directory. In WSL2 + Docker Desktop, run the command from the Ubuntu WSL terminal and use service names on the Compose network for inter-container communication:
 ```yaml
 services:
   haproxy:
@@ -1240,7 +1396,7 @@ POSTGRES_DB=labdb
 - Add a valid endpoint or revert the check path
 
 ### Exercise 3: Block app traffic with firewall
-- Add an iptables drop rule on the reverse proxy port
+- Add an iptables drop rule on the reverse proxy port on a native Ubuntu VM or host, or document the limitation if you are using WSL2 + Docker Desktop
 - Confirm failure with `curl` and `tcpdump`
 - Remove the rule and validate recovery
 
