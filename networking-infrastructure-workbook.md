@@ -603,13 +603,19 @@ sudo ufw enable
 sudo ufw status numbered
 ```
 
-### Step 3: Block a test backend port with iptables
+### Step 3: Start a temporary backend listener
+```bash
+sudo nohup python3 -m http.server 8080 --bind 0.0.0.0 >/tmp/firewall-test.log 2>&1 &
+sudo ss -tulpn | grep 8080
+```
+
+### Step 4: Block the test backend port with iptables
 ```bash
 sudo iptables -A INPUT -p tcp --dport 8080 -j DROP
 sudo iptables -L INPUT -n --line-numbers
 ```
 
-### Step 4: Verify behavior
+### Step 5: Verify behavior
 ```bash
 # Replace the example below with the externally reachable IP of this Ubuntu host.
 HOST_IP=<HOST_EXTERNAL_IP>
@@ -636,6 +642,7 @@ sudo ss -tulpn
 sudo iptables -L INPUT -n --line-numbers
 # delete the matching DROP rule number shown above, for example:
 # sudo iptables -D INPUT 1
+sudo pkill -f 'python3 -m http.server 8080' || true
 sudo ufw disable
 ```
 
@@ -758,8 +765,8 @@ sudo redis-cli get product:100
 
 ### Docker-based alternative
 ```bash
-docker run -d --name redis-lab -p 6379:6379 redis:7
-sudo redis-cli -h 127.0.0.1 -p 6379 ping
+docker run -d --name redis-lab -p 6380:6379 redis:7
+sudo redis-cli -h 127.0.0.1 -p 6380 ping
 ```
 
 ### Verification steps
